@@ -1,26 +1,22 @@
 from logs import Logger
 from datetime import datetime
-from game.graphics import Mouse, MainScreen, GameScreen, fill_gradient
+from game.graphics import GameScreen, mouse, MainScreen
+from game.vidinfo import display
 import pygame
 
 log = Logger()
 
 class App(object):
-    TITLE = ""
-    FPS = 120
     
-    def __init__(self, width:float, height:float, title:str = TITLE, fps:int = FPS):
+    def __init__(self):
         # Creates the application window for pygame
         pygame.init()
         
-        self.window = pygame.display.set_mode((width, height), flags=(pygame.RESIZABLE))
-        pygame.display.set_caption(title)
+        self.window = display.get_display
+        self.clock = display.clock
+        self.fps = self.clock.get_fps()
         
-        self.clock = pygame.time.Clock()
-        self.fps = fps
-        
-        self.mouse = Mouse()
-        pygame.mouse.set_visible(False)
+        self.mouse = mouse
         self.isMousePressed = False
         
     def run(self, debug = False):
@@ -28,22 +24,29 @@ class App(object):
         # Runs the application
         terminated:bool = False
         
+        # Initialise screens
+        ms = MainScreen()
+        ms.disabled = False
+        
+        gs = GameScreen()
+        
         while not terminated:
+            
             for event in pygame.event.get():
                 
-                # Render screens here
-                ms = MainScreen(self.window, event)
+                # Render Screens here
+                if ms.disabled == False:
+                    ms.render(event)
+                elif gs.disabled == False:
+                    gs.render(event)
                 
-                
-                # Other checking measures
                 if debug == True:
                     log.log_events(event)
                 
                 if event.type == pygame.QUIT:
                     terminated = True
-            
-            self.mouse.update_mouse_pos(self.window)
-            self.clock.tick(self.fps)
+
+            self.mouse.set_mouse_pointer(self.window)
             pygame.display.update()
                 
                     

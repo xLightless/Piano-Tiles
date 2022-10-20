@@ -1,69 +1,79 @@
+from game.vidinfo import display
 import pygame
 
-def fill_gradient(surface, color, gradient, rect=None, vertical=True, forward=True):
-    """fill a surface with a gradient pattern
-    Parameters:
-    color -> starting color
-    gradient -> final color
-    rect -> area to fill; default is surface's rect
-    vertical -> True=vertical; False=horizontal
-    forward -> True=forward; False=reverse
-    
-    Pygame recipe: http://www.pygame.org/wiki/GradientCode
-    """
-    if rect is None: rect = surface.get_rect()
-    x1,x2 = rect.left, rect.right
-    y1,y2 = rect.top, rect.bottom
-    if vertical: h = y2-y1
-    else:        h = x2-x1
-    if forward: a, b = color, gradient
-    else:       b, a = color, gradient
-    rate = (
-        float(b[0]-a[0])/h,
-        float(b[1]-a[1])/h,
-        float(b[2]-a[2])/h
-    )
-    fn_line = pygame.draw.line
-    if vertical:
-        for line in range(y1,y2):
-            color = (
-                min(max(a[0]+(rate[0]*(line-y1)),0),255),
-                min(max(a[1]+(rate[1]*(line-y1)),0),255),
-                min(max(a[2]+(rate[2]*(line-y1)),0),255)
-            )
-            fn_line(surface, color, (x1,line), (x2,line))
-    else:
-        for col in range(x1,x2):
-            color = (
-                min(max(a[0]+(rate[0]*(col-x1)),0),255),
-                min(max(a[1]+(rate[1]*(col-x1)),0),255),
-                min(max(a[2]+(rate[2]*(col-x1)),0),255)
-            )
-            fn_line(surface, color, (col,y1), (col,y2))
+_display = display.get_display
+
+class Background(object):
+    def fill_gradient(surface, color, gradient, rect=None, vertical=True, forward=True):
+        """fill a surface with a gradient pattern
+        Parameters:
+        color -> starting color
+        gradient -> final color
+        rect -> area to fill; default is surface's rect
+        vertical -> True=vertical; False=horizontal
+        forward -> True=forward; False=reverse
+        
+        Pygame recipe: http://www.pygame.org/wiki/GradientCode
+        """
+        if rect is None: rect = surface.get_rect()
+        x1,x2 = rect.left, rect.right
+        y1,y2 = rect.top, rect.bottom
+        if vertical: h = y2-y1
+        else:        h = x2-x1
+        if forward: a, b = color, gradient
+        else:       b, a = color, gradient
+        rate = (
+            float(b[0]-a[0])/h,
+            float(b[1]-a[1])/h,
+            float(b[2]-a[2])/h
+        )
+        fn_line = pygame.draw.line
+        if vertical:
+            for line in range(y1,y2):
+                color = (
+                    min(max(a[0]+(rate[0]*(line-y1)),0),255),
+                    min(max(a[1]+(rate[1]*(line-y1)),0),255),
+                    min(max(a[2]+(rate[2]*(line-y1)),0),255)
+                )
+                fn_line(surface, color, (x1,line), (x2,line))
+        else:
+            for col in range(x1,x2):
+                color = (
+                    min(max(a[0]+(rate[0]*(col-x1)),0),255),
+                    min(max(a[1]+(rate[1]*(col-x1)),0),255),
+                    min(max(a[2]+(rate[2]*(col-x1)),0),255)
+                )
+                fn_line(surface, color, (col,y1), (col,y2))
             
             
 class Mouse(object):
-    """ Manages mouse graphics """
+    """ Manages mouse graphics and cursor information """
+    pygame.mouse.set_visible(False)
+    button_down = False
+    button_up = True
     
-    def update_mouse_pos(self, window, color:tuple = (255, 255, 255), x:int = None, y:int = None):
+    def set_mouse_pointer(self, window, color:tuple = (0, 0, 0), x:int = None, y:int = None):
         mousepos = pygame.mouse.get_pos()
-        cursor_outer = pygame.draw.circle(window, color, mousepos, 20, 3)
-        cursor_inner = pygame.draw.circle(window, color, mousepos, 12, 3)
-        return (cursor_outer, cursor_inner)
+        outer = pygame.draw.circle(window, color, mousepos, 20, 3)
+        inner = pygame.draw.circle(window, color, mousepos, 12, 3)
+        return (outer, inner)
+    
+    def is_over(self, obj):
+        """ Used to check if the mouse is over an object """
+        mousepos = pygame.mouse.get_pos()
+        return True if obj.collidepoint(mousepos[0], mousepos[1]) else False
+    
+mouse = Mouse()
 
 class Button(object):
-    """ Creates an interactive button object on a surface 
-    
-        e.g: menu_screen = Screen()
-        e.g: menu_screen.surface.blit(button, x, y)
-    
-    """
+    """ Creates a Button on the display """
     def __init__(
         self,
         surface,
         text:str,
         font:str = 'arial',
-        font_size:int = 11
+        font_size:int = 11,
+        callback = None
     ):
         # The surface/window of the parent
         self.surface = surface
@@ -91,11 +101,14 @@ class Button(object):
             
         }
         
-        self.btn_color = (50,50,50)
-        self.btn_click_color = (124,252,0)
+        self.btn_color = (0, 0, 0)
+        self.btn_click_color = (124, 252, 0)
         border_radius = self.br = 4
-
+        
+        self.callback = callback
+            
     def render(self, x:float, y:float):
+        """ Renders the Button object to a window or screen """
         font = pygame.font.SysFont(self.font, self.font_size) 
         text_color = self.text_color
         self.text_obj = font.render(self.text, True, text_color)
@@ -112,14 +125,27 @@ class Button(object):
             (self.btn_obj.centerx - (self.text_obj.get_width()/2), 
             (self.btn_obj.centery - (self.text_obj.get_height()/2)))
         )
+        self._hover(self.btn_obj)
         
-    def _is_over(self, btn_obj):
-        # Checks if mouse is ontop of a Button object
-        pos = pygame.mouse.get_pos()
-        return True if btn_obj.collidepoint(pos[0], pos[1]) else False
+    def _hover(self, btn_obj, hover_color:tuple = (41, 43, 44)):
+        """ Adds style to the Button object when hovered on """
+        if self._is_over(btn_obj):
+            pygame.draw.rect(self.surface, hover_color, btn_obj, border_radius = self.br)
+            self.surface.blit(
+                self.text_obj,
+                (btn_obj.centerx - (self.text_obj.get_width()/2), 
+                (btn_obj.centery - (self.text_obj.get_height()/2)))
+            )
+        
+    def _is_over(self, btn_obj = None):
+        """ Private function that checks the button a user is interacting with """
+        if btn_obj is not None:
+            pos = pygame.mouse.get_pos()
+            return True if btn_obj.collidepoint(pos[0], pos[1]) else False
+        else: 
+            btn_obj = self.btn_obj
     
-    def target(self, event, action = None):
-        # Targets the action of the button when interacted with
+    def target(self, event):
         """
             event (int): type of event to check for,
             action (Any): the target of the object interaction - typically used via a function
@@ -128,62 +154,60 @@ class Button(object):
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:
                 if self._is_over(self.btn_obj) == True:
-                    # Update the color of the button when clicked and run 'action'
+                    # Adds a click color to the button
                     pygame.draw.rect(self.surface, self.btn_click_color, self.btn_obj, border_radius = self.br)
                     self.surface.blit(
                         self.text_obj,
                         (self.btn_obj.centerx - (self.text_obj.get_width()/2), 
                         (self.btn_obj.centery - (self.text_obj.get_height()/2)))
                     )
-                    
-                    action
 
-class Screen(object):
-    """ Base class to update new screen (surfaces) to the special pygame.display screen """
-    def __init__(
-        self,
-        display
-    ):
-        self.display = display # Used to get the top level display of the application
-        self.width, self.height = self.display.get_size()
-        
-    def render(self, obj, x:float, y:float):
-        """ Used to render objects to the current screen """
-        self.display.blit(obj, (x, y))
-        pygame.display.update()
+class Screen(object): pass
         
 class MainScreen(Screen):
     """ Game Menu Screen """
     def __init__(
-        self,
-        display,
-        event_loop
+        self
     ):
-        self.display = display  # Used to get the top level display of the application
-        clear_screen = (255, 255, 255)
-        self.display.fill(clear_screen)
+        self.display = _display # Top Level Display
+        self.disabled = True
         
-        # Add some buttons to the main menu interface
-        btn_obj = Button(self.display, "Play Game", font_size = 32)
-        btn_obj.btn_color = (128, 0, 0)
-        btn_obj.btn_click_color = (102, 51, 153)
-        btn_obj.render(self.display.get_width()/2, self.display.get_height()/2)
-        btn_obj.target(event_loop)
+    def render(self, event:pygame.event.Event = None):
+        """ Renders screen data to the display if not disabled """
+        Background.fill_gradient(self.display, (236, 0, 140), (252, 103, 103))
+        
+        # Add some buttons to the main menu interface if not disabled
+        if not self.disabled:
+            
+            btn_obj = Button(self.display, "Play Game", font_size = 32)
+            btn_obj.btn_click_color = (102, 51, 153)
+            btn_obj.render(self.display.get_width()/2, self.display.get_height()/2) 
+                
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if mouse.is_over(btn_obj.btn_obj):
+                    btn_obj.target(event)
+                    self.disabled = True
+                
         
 class GameScreen(Screen):
     """ Game Screen """
     def __init__(
-        self,
-        display,
-        event_loop
+        self
     ):
-        self.display = display  # Used to get the top level display of the application
-        clear_screen = (255, 255, 255)
-        self.display.fill(clear_screen)
+        self.display = _display # Top Level Display
+        self.disabled = True
         
-        # Add some buttons to the main menu interface
-        btn_obj = Button(self.display, "Test game screen button", font_size = 32)
-        btn_obj.btn_color = (128,0,0)
-        btn_obj.btn_click_color = (102, 51, 153)
-        btn_obj.render(self.display.get_width()/2, self.display.get_height()/2)
-        btn_obj.target(event_loop, action = None)
+    def render(self, event:pygame.event.Event = None):
+        """ Renders screen data to the display if not disabled """
+        Background.fill_gradient(self.display, (236, 0, 140), (252, 103, 103))
+        
+        # Add some buttons to the main menu interface if not disabled
+        if not self.disabled:
+            
+            btn_obj = Button(self.display, "Game screen button ", font_size = 32)
+            btn_obj.btn_click_color = (102, 51, 153)
+            btn_obj.render(self.display.get_width()/2, self.display.get_height()/2) 
+                
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if mouse.is_over(btn_obj.btn_obj):
+                    btn_obj.target(event)
