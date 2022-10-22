@@ -1,7 +1,4 @@
-from game.vidinfo import display
 import pygame
-
-_display = display.get_display
 
 class Background(object):
     def fill_gradient(surface, color, gradient, rect=None, vertical=True, forward=True):
@@ -48,11 +45,12 @@ class Background(object):
             
 class Mouse(object):
     """ Manages mouse graphics and cursor information """
-    pygame.mouse.set_visible(False)
+
     button_down = False
     button_up = True
     
     def set_mouse_pointer(self, window, color:tuple = (0, 0, 0), x:int = None, y:int = None):
+        pygame.mouse.set_visible(False)
         mousepos = pygame.mouse.get_pos()
         outer = pygame.draw.circle(window, color, mousepos, 20, 3)
         inner = pygame.draw.circle(window, color, mousepos, 12, 3)
@@ -69,11 +67,12 @@ class Button(object):
     """ Creates a Button on the display """
     def __init__(
         self,
-        surface,
-        text:str,
+        surface:pygame.Surface,
+        x:float = 0,
+        y:float = 0,
+        text:str = "",
         font:str = 'arial',
-        font_size:int = 11,
-        callback = None
+        font_size:int = 11
     ):
         # The surface/window of the parent
         self.surface = surface
@@ -82,7 +81,7 @@ class Button(object):
         self.text = text
         self.font = font
         self.font_size = font_size
-        self.text_color = (255, 255, 255)
+        self.text_color:tuple = (255, 255, 255)
         
         # Button dimensions and color
         self.padding = {
@@ -101,21 +100,29 @@ class Button(object):
             
         }
         
-        self.btn_color = (0, 0, 0)
-        self.btn_click_color = (124, 252, 0)
-        border_radius = self.br = 4
+        self.btn_color:tuple = (0, 0, 0)
+        self.btn_hover_color:tuple = (31, 33, 34)
+        self.btn_click_color:tuple = (61, 63, 64)
+        self.br:int = 4 # Button Border Radius
         
-        self.callback = callback
-            
-    def render(self, x:float, y:float):
+        # Button display positioning
+        self.x:float = self.surface.get_width()/2 + x
+        self.y:float = self.surface.get_height()/2 + y
+        
+        # This parameter helps encourage screen switching rather than using generic callbacks to achieve a goal
+        self.is_clicked = False
+        
+    def render(self, x:float = None, y:float = None):
         """ Renders the Button object to a window or screen """
+        
+        x = self.x if x is None else x
+        y = self.y if y is None else y        
         font = pygame.font.SysFont(self.font, self.font_size) 
         text_color = self.text_color
         self.text_obj = font.render(self.text, True, text_color)
         
         self.btn_width = self.text_obj.get_width() + self.padding["top"]
         self.btn_height = self.text_obj.get_height() + self.padding["left"]
-        
         self.btn_obj = pygame.Rect(x-(self.btn_width/2), y-(self.btn_height/2), self.btn_width, self.btn_height)
         
         # Draws button object to parent surface then draws text object to button
@@ -125,89 +132,47 @@ class Button(object):
             (self.btn_obj.centerx - (self.text_obj.get_width()/2), 
             (self.btn_obj.centery - (self.text_obj.get_height()/2)))
         )
-        self._hover(self.btn_obj)
         
-    def _hover(self, btn_obj, hover_color:tuple = (41, 43, 44)):
+        # Styles button interactions
+        self._hover()
+        self._is_clicked()
+        
+    def _hover(self, hover_color:tuple = None):
         """ Adds style to the Button object when hovered on """
-        if self._is_over(btn_obj):
-            pygame.draw.rect(self.surface, hover_color, btn_obj, border_radius = self.br)
+        
+        hover_color = self.btn_hover_color if hover_color is None else hover_color
+        if self._is_over(self.btn_obj):
+            pygame.draw.rect(self.surface, hover_color, self.btn_obj, border_radius = self.br)
             self.surface.blit(
                 self.text_obj,
-                (btn_obj.centerx - (self.text_obj.get_width()/2), 
-                (btn_obj.centery - (self.text_obj.get_height()/2)))
+                (self.btn_obj.centerx - (self.text_obj.get_width()/2), 
+                (self.btn_obj.centery - (self.text_obj.get_height()/2)))
             )
+    def _is_clicked(self, click_color:tuple = None):
+        """ Adds style to the Button object when clicked on """
+        
+        click_color = self.btn_click_color if click_color is None else click_color
+        mousepress = pygame.mouse.get_pressed()[0] # Left Click
+
+        if mousepress and self._is_over(self.btn_obj) == True:
+            # Styles the button when clicked
+            pygame.draw.rect(self.surface, click_color, self.btn_obj, border_radius = self.br)
+            self.surface.blit(
+                self.text_obj,
+                (self.btn_obj.centerx - (self.text_obj.get_width()/2), 
+                (self.btn_obj.centery - (self.text_obj.get_height()/2)))
+            )
+            
+            self.is_clicked = True
+            
+            if self.is_clicked == True:
+                return self.callback()
         
     def _is_over(self, btn_obj = None):
         """ Private function that checks the button a user is interacting with """
+        
         if btn_obj is not None:
             pos = pygame.mouse.get_pos()
             return True if btn_obj.collidepoint(pos[0], pos[1]) else False
         else: 
             btn_obj = self.btn_obj
-    
-    def target(self, event):
-        """
-            event (int): type of event to check for,
-            action (Any): the target of the object interaction - typically used via a function
-        """
-        
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1:
-                if self._is_over(self.btn_obj) == True:
-                    # Adds a click color to the button
-                    pygame.draw.rect(self.surface, self.btn_click_color, self.btn_obj, border_radius = self.br)
-                    self.surface.blit(
-                        self.text_obj,
-                        (self.btn_obj.centerx - (self.text_obj.get_width()/2), 
-                        (self.btn_obj.centery - (self.text_obj.get_height()/2)))
-                    )
-
-class Screen(object): pass
-        
-class MainScreen(Screen):
-    """ Game Menu Screen """
-    def __init__(
-        self
-    ):
-        self.display = _display # Top Level Display
-        self.disabled = True
-        
-    def render(self, event:pygame.event.Event = None):
-        """ Renders screen data to the display if not disabled """
-        Background.fill_gradient(self.display, (236, 0, 140), (252, 103, 103))
-        
-        # Add some buttons to the main menu interface if not disabled
-        if not self.disabled:
-            
-            btn_obj = Button(self.display, "Play Game", font_size = 32)
-            btn_obj.btn_click_color = (102, 51, 153)
-            btn_obj.render(self.display.get_width()/2, self.display.get_height()/2) 
-                
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if mouse.is_over(btn_obj.btn_obj):
-                    btn_obj.target(event)
-                    self.disabled = True
-                
-        
-class GameScreen(Screen):
-    """ Game Screen """
-    def __init__(
-        self
-    ):
-        self.display = _display # Top Level Display
-        self.disabled = True
-        
-    def render(self, event:pygame.event.Event = None):
-        """ Renders screen data to the display if not disabled """
-        Background.fill_gradient(self.display, (236, 0, 140), (252, 103, 103))
-        
-        # Add some buttons to the main menu interface if not disabled
-        if not self.disabled:
-            
-            btn_obj = Button(self.display, "Game screen button ", font_size = 32)
-            btn_obj.btn_click_color = (102, 51, 153)
-            btn_obj.render(self.display.get_width()/2, self.display.get_height()/2) 
-                
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if mouse.is_over(btn_obj.btn_obj):
-                    btn_obj.target(event)

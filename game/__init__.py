@@ -1,6 +1,7 @@
 from logs import Logger
 from datetime import datetime
-from game.graphics import GameScreen, mouse, MainScreen
+from game.graphics.components import mouse
+from game.graphics.screens import GameScreen, Main
 from game.vidinfo import display
 import pygame
 
@@ -13,6 +14,7 @@ class App(object):
         pygame.init()
         
         self.window = display.get_display
+        self.display = display
         self.clock = display.clock
         self.fps = self.clock.get_fps()
         
@@ -25,10 +27,10 @@ class App(object):
         terminated:bool = False
         
         # Initialise screens
-        ms = MainScreen()
+        ms = Main(display = self.window)
         ms.disabled = False
         
-        gs = GameScreen()
+        gs = GameScreen(display = self.window)
         
         while not terminated:
             
@@ -37,8 +39,8 @@ class App(object):
                 # Render Screens here
                 if ms.disabled == False:
                     ms.render(event)
-                elif gs.disabled == False:
-                    gs.render(event)
+                # elif gs.disabled == False:
+                #     gs.render(event)
                 
                 if debug == True:
                     log.log_events(event)
@@ -48,10 +50,3 @@ class App(object):
 
             self.mouse.set_mouse_pointer(self.window)
             pygame.display.update()
-                
-                    
-                    
-                    
-                
-                    
-                    
