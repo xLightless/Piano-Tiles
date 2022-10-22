@@ -110,7 +110,10 @@ class Button(object):
         self.y:float = self.surface.get_height()/2 + y
         
         # This parameter helps encourage screen switching rather than using generic callbacks to achieve a goal
-        self.is_clicked = False
+        self.is_clicked:bool = False
+        """
+            Example: if #.clicked == True 'run code' else 'do something'
+        """
         
     def render(self, x:float = None, y:float = None):
         """ Renders the Button object to a window or screen """
@@ -164,9 +167,6 @@ class Button(object):
             )
             
             self.is_clicked = True
-            
-            if self.is_clicked == True:
-                return self.callback()
         
     def _is_over(self, btn_obj = None):
         """ Private function that checks the button a user is interacting with """
